@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>chouAI — AI Study Companion for Math</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<!-- KaTeX for math rendering (synchronous — must be available before chat JS runs) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#f5f3ee;
+  --surface:#ffffff;
+  --surface2:#eceae3;
+  --surface3:#f0ede6;
+  --text:#1c1b18;
+  --muted:#6b6660;
+  --hint:#a09c96;
+  --accent:#5b6ef5;
+  --accent2:#7c8ff8;
+  --accent-light:#eef0fe;
+  --accent-dark:#3a4fd1;
+  --green:#2a8a5a;
+  --green-light:#e8f5ef;
+  --border:rgba(0,0,0,0.07);
+  --border2:rgba(0,0,0,0.12);
+  --shadow:0 2px 12px rgba(0,0,0,0.06);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.10);
+  --radius:10px;
+  --radius-lg:18px;
+  --radius-xl:24px;
+  --font-serif:'Instrument Serif',Georgia,serif;
+  --font-sans:'DM Sans',system-ui,sans-serif;
+  --font-mono:'SF Mono','Fira Code',monospace;
+}
+
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-sans);
+  font-size:15px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── NOISE TEXTURE OVERLAY ── */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;
+  z-index:0;
+  opacity:.4;
+}
+#app{position:relative;z-index:1}
+
+/* ── NAV ── */
+nav{
+  background:rgba(245,243,238,0.85);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:0 2rem;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.nav-logo{
+  font-family:var(--font-serif);
+  font-size:20px;
+  display:flex;align-items:center;gap:8px;
+  color:var(--text);
+}
+.nav-dot{
+  width:9px;height:9px;
+  background:var(--accent);
+  border-radius:50%;
+  animation:pulse-dot 2.5s ease-in-out infinite;
+}
+@keyframes pulse-dot{
+  0%,100%{box-shadow:0 0 0 0 rgba(91,110,245,0.4)}
+  50%{box-shadow:0 0 0 6px rgba(91,110,245,0)}
+}
+.nav-links{display:flex;gap:1.8rem}
+.nav-links a{
+  font-size:13.5px;color:var(--muted);
+  cursor:pointer;text-decoration:none;
+  transition:color .2s;
+}
+.nav-links a:hover{color:var(--accent)}
+.nav-cta{
+  background:var(--accent);color:#fff;
+  border:none;padding:8px 18px;
+  border-radius:var(--radius);
+  font-size:13.5px;cursor:pointer;
+  font-weight:500;font-family:var(--font-sans);
+  transition:background .2s,transform .15s,box-shadow .2s;
+  box-shadow:0 2px 8px rgba(91,110,245,0.3);
+}
+.nav-cta:hover{
+  background:var(--accent-dark);
+  transform:translateY(-1px);
+  box-shadow:0 4px 14px rgba(91,110,245,0.4);
+}
+
+/* ── HERO ── */
+.hero{
+  padding:5rem 2rem 3.5rem;
+  max-width:860px;margin:0 auto;
+  text-align:center;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--accent-light);
+  color:var(--accent);
+  border:1px solid rgba(91,110,245,0.18);
+  padding:5px 14px;border-radius:30px;
+  font-size:12.5px;margin-bottom:1.8rem;
+  font-weight:500;
+  animation:badge-in .6s ease both;
+}
+@keyframes badge-in{
+  from{opacity:0;transform:translateY(-8px)}
+  to{opacity:1;transform:none}
+}
+.hero h1{
+  font-family:var(--font-serif);
+  font-size:54px;font-weight:400;
+  line-height:1.12;letter-spacing:-.5px;
+  margin-bottom:1.2rem;
+  animation:hero-title .7s ease .1s both;
+}
+.hero h1 em{
+  font-style:italic;
+  color:var(--accent);
+}
+@keyframes hero-title{
+  from{opacity:0;transform:translateY(16px)}
+  to{opacity:1;transform:none}
+}
+.hero-sub{
+  font-size:17px;color:var(--muted);
+  max-width:500px;margin:0 auto 2.5rem;
+  line-height:1.75;
+  animation:hero-sub .7s ease .2s both;
+}
+@keyframes hero-sub{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:none}
+}
+.hero-btns{
+  display:flex;gap:12px;justify-content:center;
+  flex-wrap:wrap;margin-bottom:2.8rem;
+  animation:hero-btns .7s ease .3s both;
+}
+@keyframes hero-btns{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:none}
+}
+.btn-primary{
+  background:var(--accent);color:#fff;
+  border:none;padding:13px 28px;
+  border-radius:var(--radius);font-size:14.5px;
+  cursor:pointer;font-weight:500;
+  font-family:var(--font-sans);
+  transition:background .2s,transform .15s,box-shadow .2s;
+  box-shadow:0 3px 12px rgba(91,110,245,0.35);
+}
+.btn-primary:hover{
+  background:var(--accent-dark);
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(91,110,245,0.4);
+}
+.btn-outline{
+  background:var(--surface);color:var(--text);
+  border:1px solid var(--border2);
+  padding:13px 28px;border-radius:var(--radius);
+  font-size:14.5px;cursor:pointer;
+  font-family:var(--font-sans);
+  transition:border-color .2s,color .2s,transform .15s,box-shadow .2s;
+}
+.btn-outline:hover{
+  border-color:var(--accent);color:var(--accent);
+  transform:translateY(-2px);
+  box-shadow:0 4px 14px rgba(0,0,0,0.08);
+}
+
+/* ── HERO CHAT PREVIEW ── */
+.chat-preview{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-xl);
+  padding:1.2rem;
+  max-width:440px;margin:0 auto;
+  text-align:left;
+  box-shadow:var(--shadow-lg);
+  animation:chat-preview-in .8s ease .4s both;
+}
+@keyframes chat-preview-in{
+  from{opacity:0;transform:translateY(20px) scale(.98)}
+  to{opacity:1;transform:none}
+}
+.cp-bar{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:.9rem;padding-bottom:.9rem;
+  border-bottom:1px solid var(--border);
+}
+.cp-av{
+  width:32px;height:32px;
+  background:var(--accent-light);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;line-height:1;
+}
+.cp-name{font-size:13.5px;font-weight:500}
+.cp-st{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.cp-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.bubble{
+  padding:10px 14px;border-radius:12px;
+  font-size:13px;line-height:1.65;
+  margin-bottom:9px;max-width:92%;
+}
+.bubble.u{
+  background:var(--accent);color:#fff;
+  margin-left:auto;
+  border-radius:12px 3px 12px 12px;
+}
+.bubble.b{
+  background:var(--surface2);color:var(--text);
+  border-radius:3px 12px 12px 12px;
+}
+.bubble code{
+  background:rgba(91,110,245,0.14);
+  padding:1px 6px;border-radius:4px;
+  font-family:var(--font-mono);font-size:12px;
+}
+
+/* ── DIVIDER ── */
+hr.div{border:none;border-top:1px solid var(--border)}
+
+/* ── SECTION BASES ── */
+section{padding:4rem 2rem;max-width:860px;margin:0 auto}
+.sec-label{
+  font-size:11px;color:var(--accent);
+  letter-spacing:2.5px;text-transform:uppercase;
+  margin-bottom:.6rem;text-align:center;font-weight:500;
+}
+.sec-title{
+  font-family:var(--font-serif);
+  font-size:34px;font-weight:400;
+  text-align:center;margin-bottom:.5rem;
+  letter-spacing:-.3px;line-height:1.2;
+}
+.sec-sub{
+  color:var(--muted);font-size:15.5px;
+  text-align:center;margin-bottom:2.8rem;
+  max-width:500px;margin-left:auto;margin-right:auto;
+}
+
+/* ── FEATURES ── */
+.feat-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:14px;
+}
+.feat-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:1.6rem;
+  transition:border-color .2s,transform .25s,box-shadow .25s;
+  cursor:default;
+}
+.feat-card:hover{
+  border-color:var(--accent);
+  transform:translateY(-4px);
+  box-shadow:0 10px 30px rgba(91,110,245,0.1);
+}
+.feat-icon{
+  width:42px;height:42px;
+  background:var(--accent-light);
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;line-height:1;
+  margin-bottom:1rem;
+  transition:background .2s,transform .2s;
+}
+.feat-card:hover .feat-icon{
+  background:var(--accent);
+  transform:scale(1.08);
+  filter:brightness(0) invert(1);
+}
+.feat-card h3{font-size:14.5px;font-weight:500;margin-bottom:.5rem}
+.feat-card p{font-size:13px;color:var(--muted);line-height:1.65}
+
+/* ── PRICING ── */
+.plans{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:18px;
+}
+.plan{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-xl);
+  padding:1.8rem;
+  transition:transform .25s,box-shadow .25s;
+}
+.plan:hover{
+  transform:translateY(-4px);
+  box-shadow:0 12px 36px rgba(0,0,0,0.09);
+}
+.plan.featured{
+  border:2px solid var(--accent);
+  background:linear-gradient(160deg,#f7f8ff 0%,var(--surface) 60%);
+  box-shadow:0 4px 24px rgba(91,110,245,0.12);
+}
+.plan.featured:hover{
+  box-shadow:0 14px 40px rgba(91,110,245,0.18);
+}
+.plan-pill{
+  font-size:11px;
+  background:var(--accent-light);color:var(--accent);
+  border:1px solid rgba(91,110,245,0.2);
+  padding:3px 11px;border-radius:20px;
+  display:inline-block;margin-bottom:1.1rem;
+  font-weight:500;
+}
+.plan.featured .plan-pill{
+  background:var(--accent);color:#fff;border-color:transparent;
+}
+.plan-name{font-size:20px;font-weight:500;margin-bottom:.3rem}
+.plan-desc{font-size:13px;color:var(--muted);margin-bottom:1.4rem;line-height:1.6}
+.plan-price{
+  display:flex;align-items:baseline;gap:3px;
+  margin-bottom:.4rem;
+}
+.plan-price .amt{
+  font-family:var(--font-serif);
+  font-size:42px;font-weight:400;line-height:1;
+}
+.plan-price .curr{font-size:18px;color:var(--muted)}
+.plan-price .per{font-size:13px;color:var(--muted)}
+.plan-limit{
+  font-size:12px;color:var(--hint);
+  margin-bottom:1.6rem;
+  display:flex;align-items:center;gap:5px;
+}
+.plan-feats{list-style:none;margin-bottom:1.8rem}
+.plan-feats li{
+  font-size:13.5px;color:var(--muted);
+  padding:6px 0;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.plan-feats li:last-child{border-bottom:none}
+.feat-check{color:var(--green);font-size:15px;font-weight:600;flex-shrink:0}
+.feat-x{color:var(--hint);font-size:15px;font-weight:600;flex-shrink:0}
+.btn-free{
+  width:100%;padding:11px;border-radius:var(--radius);
+  font-size:13.5px;cursor:pointer;
+  background:var(--surface);
+  border:1px solid var(--border2);
+  color:var(--text);font-weight:500;
+  font-family:var(--font-sans);
+  transition:border-color .2s,color .2s,transform .15s;
+}
+.btn-free:hover{
+  border-color:var(--accent);color:var(--accent);
+  transform:translateY(-1px);
+}
+.btn-paid{
+  width:100%;padding:11px;border-radius:var(--radius);
+  font-size:13.5px;cursor:pointer;
+  background:var(--accent);border:none;
+  color:#fff;font-weight:500;
+  font-family:var(--font-sans);
+  transition:background .2s,transform .15s,box-shadow .2s;
+  box-shadow:0 3px 12px rgba(91,110,245,0.3);
+}
+.btn-paid:hover{
+  background:var(--accent-dark);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px rgba(91,110,245,0.4);
+}
+.pricing-note{
+  text-align:center;margin-top:1.1rem;
+  font-size:12.5px;color:var(--hint);
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.compare-note{
+  background:var(--surface3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:1.1rem 1.4rem;
+  margin-top:1.6rem;max-width:560px;
+  margin-left:auto;margin-right:auto;
+}
+.compare-note p{font-size:13px;color:var(--muted);text-align:center;line-height:1.7}
+.compare-note strong{color:var(--text);font-weight:500}
+
+/* ── DEMO / CHAT ── */
+.chat-wrap{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-xl);
+  overflow:hidden;
+  max-width:640px;margin:0 auto;
+  box-shadow:var(--shadow-lg);
+  display:flex;flex-direction:column;
+}
+.chat-header{
+  background:var(--surface3);
+  padding:13px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.ch-left{display:flex;align-items:center;gap:10px}
+.ch-av{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,var(--accent-light),#dde2fd);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;line-height:1;
+  flex-shrink:0;
+}
+.ch-info{display:flex;flex-direction:column;gap:1px}
+.ch-name{font-size:13.5px;font-weight:500;line-height:1.3}
+.ch-sub{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.ch-status-dot{
+  width:5px;height:5px;background:#22c55e;
+  border-radius:50%;flex-shrink:0;
+  animation:status-pulse 2.4s ease-in-out infinite;
+}
+@keyframes status-pulse{
+  0%,100%{opacity:1}50%{opacity:.4}
+}
+.plan-toggle{display:flex;gap:6px;flex-shrink:0}
+.ptab{
+  padding:5px 13px;border-radius:7px;
+  font-size:12px;cursor:pointer;
+  border:1px solid var(--border);
+  background:var(--surface);color:var(--muted);
+  font-family:var(--font-sans);font-weight:500;
+  transition:background .18s,color .18s,border-color .18s;
+  user-select:none;
+}
+.ptab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ptab:not(.active):hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── MODE SELECTOR BAR ── */
+.mode-bar{
+  padding:10px 14px 9px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-shrink:0;
+}
+.mode-label{
+  font-size:11px;
+  color:var(--hint);
+  font-weight:500;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  margin-right:2px;
+  flex-shrink:0;
+}
+.mode-btns{display:flex;gap:5px;flex-wrap:wrap}
+.mbtn{
+  display:flex;align-items:center;gap:5px;
+  padding:5px 11px;
+  border-radius:20px;
+  border:1px solid var(--border);
+  background:var(--surface2);
+  color:var(--muted);
+  font-size:12px;font-weight:500;
+  font-family:var(--font-sans);
+  cursor:pointer;
+  transition:border-color .18s,color .18s,background .18s,box-shadow .18s;
+  user-select:none;
+  white-space:nowrap;
+}
+.mbtn:hover:not(.active){
+  border-color:var(--accent);
+  color:var(--accent);
+  background:var(--accent-light);
+}
+.mbtn.active{
+  background:var(--accent);
+  color:#fff;
+  border-color:var(--accent);
+  box-shadow:0 2px 8px rgba(91,110,245,0.28);
+}
+.mbtn-icon{font-size:13px;line-height:1}
+/* Mode-specific accent colors when active */
+.mbtn.active.mode-quick{background:#f59e0b;border-color:#f59e0b;box-shadow:0 2px 8px rgba(245,158,11,0.28)}
+.mbtn.active.mode-tutor{background:var(--accent);border-color:var(--accent)}
+.mbtn.active.mode-hint{background:var(--green);border-color:var(--green);box-shadow:0 2px 8px rgba(42,138,90,0.28)}
+/* Mode badge on bot messages */
+.mode-tag{
+  display:inline-block;
+  font-size:10px;font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase;
+  padding:2px 7px;border-radius:10px;
+  margin-bottom:5px;
+  opacity:.75;
+}
+.mode-tag.quick{background:#fef3c7;color:#92400e}
+.mode-tag.tutor{background:var(--accent-light);color:var(--accent-dark)}
+.mode-tag.hint{background:var(--green-light);color:var(--green)}
+
+/* Suggestion chips */
+.chat-sugs{
+  padding:8px 14px;
+  display:flex;gap:7px;flex-wrap:wrap;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  flex-shrink:0;
+}
+.sug{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  color:var(--muted);padding:5px 13px;
+  border-radius:20px;font-size:12px;
+  cursor:pointer;white-space:nowrap;
+  transition:border-color .18s,color .18s,background .18s,transform .15s;
+}
+.sug:hover{
+  border-color:var(--accent);color:var(--accent);
+  background:var(--accent-light);
+  transform:translateY(-1px);
+}
+
+/* Message list */
+.chat-msgs{
+  padding:18px 16px;
+  min-height:260px;max-height:360px;
+  overflow-y:auto;
+  display:flex;flex-direction:column;
+  gap:0; /* managed by margin on .msg */
+  scroll-behavior:smooth;
+  flex:1;
+}
+/* Custom scrollbar */
+.chat-msgs::-webkit-scrollbar{width:4px}
+.chat-msgs::-webkit-scrollbar-track{background:transparent}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.chat-msgs::-webkit-scrollbar-thumb:hover{background:var(--hint)}
+
+/* Base message */
+.msg{
+  max-width:82%;
+  padding:11px 15px;
+  font-size:13.5px;line-height:1.75;
+  border-radius:18px;
+  position:relative;
+  /* Entrance animation */
+  opacity:0;
+  transform:translateY(8px);
+  animation:msg-appear .28s cubic-bezier(.22,.68,0,1.2) forwards;
+}
+@keyframes msg-appear{
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* Bot message */
+.msg.bot{
+  background:var(--surface2);
+  color:var(--text);
+  align-self:flex-start;
+  border-radius:4px 18px 18px 18px;
+  border:1px solid var(--border);
+  margin-bottom:10px;
+  margin-right:18px;
+}
+
+/* First bot message — no top margin */
+.msg.bot:first-child{margin-top:0}
+
+/* User message */
+.msg.user{
+  background:var(--accent);
+  color:#fff;
+  align-self:flex-end;
+  border-radius:18px 4px 18px 18px;
+  margin-bottom:6px;
+  margin-left:18px;
+  box-shadow:0 2px 10px rgba(91,110,245,0.22);
+}
+
+/* Consecutive bot messages — tighter gap */
+.msg.bot + .msg.bot{margin-top:-4px;margin-bottom:10px}
+/* Bot after user — a bit more breathing room */
+.msg.user + .msg.bot{margin-top:4px}
+
+/* KaTeX rendering in chat */
+.msg .katex-display{
+  margin:.7em 0 .4em;
+  overflow-x:auto;
+  overflow-y:hidden;
+  text-align:center;
+  padding:.3em 0;
+}
+.msg .katex-display > .katex{max-width:100%}
+.msg .katex{font-size:1.05em;line-height:1.5}
+.msg strong{font-weight:600;color:inherit}
+.msg code{
+  background:rgba(0,0,0,0.07);
+  padding:1px 6px;border-radius:4px;
+  font-family:var(--font-mono);font-size:12px;
+  color:var(--accent-dark);
+}
+.msg.user .katex,.msg.user strong{color:#fff}
+.msg.user code{background:rgba(255,255,255,0.22);color:#fff}
+
+/* Paragraph and list spacing inside bot responses */
+.msg.bot .msg-para{
+  margin:0 0 .6em;
+  line-height:1.8;
+}
+.msg.bot .msg-para:last-child{margin-bottom:0}
+.msg.bot .msg-list{
+  margin:.2em 0 .6em 1.1em;
+  padding:0;
+  line-height:1.8;
+}
+.msg.bot .msg-list li{margin-bottom:.25em}
+.msg.bot .msg-list li:last-child{margin-bottom:0}
+.msg.bot ol.msg-list{list-style:decimal}
+.msg.bot ul.msg-list{list-style:disc}
+/* Paragraph spacing inside bot responses (legacy compat) */
+.msg.bot .para{display:block;margin-bottom:.55em}
+.msg.bot .para:last-child{margin-bottom:0}
+
+/* Typing indicator bubble */
+.msg.typing{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  align-self:flex-start;
+  border-radius:4px 18px 18px 18px;
+  margin-bottom:10px;
+  padding:13px 17px;
+  min-width:60px;
+}
+.typing-label{
+  display:flex;align-items:center;gap:9px;
+  font-size:12px;color:var(--hint);font-style:italic;
+}
+.typing-thinking{
+  font-size:12px;color:var(--hint);font-style:italic;letter-spacing:.01em;
+}
+.typing-dots{display:inline-flex;gap:4px;align-items:center}
+.typing-dots span{
+  width:5px;height:5px;
+  background:var(--hint);border-radius:50%;
+  animation:td 1.3s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2){animation-delay:.18s}
+.typing-dots span:nth-child(3){animation-delay:.36s}
+@keyframes td{
+  0%,60%,100%{opacity:.25;transform:translateY(0)}
+  30%{opacity:1;transform:translateY(-3px)}
+}
+
+/* Streaming cursor blink */
+.stream-cursor{
+  display:inline-block;
+  width:2px;height:1em;
+  background:var(--muted);
+  margin-left:2px;
+  vertical-align:text-bottom;
+  border-radius:1px;
+  animation:cursor-blink .7s ease infinite;
+}
+@keyframes cursor-blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* Input row */
+.chat-input-row{
+  display:flex;gap:9px;
+  padding:12px 14px;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  flex-shrink:0;
+  align-items:flex-end;
+}
+#chatInput{
+  flex:1;background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 14px;color:var(--text);
+  font-size:13.5px;outline:none;
+  font-family:var(--font-sans);
+  line-height:1.5;
+  resize:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+#chatInput:focus{
+  border-color:var(--accent);
+  background:var(--surface);
+  box-shadow:0 0 0 3px rgba(91,110,245,0.09);
+}
+#chatInput::placeholder{color:var(--hint)}
+.send-btn{
+  background:var(--accent);border:none;
+  color:#fff;width:38px;height:38px;
+  border-radius:11px;cursor:pointer;
+  font-size:16px;font-weight:700;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  transition:background .18s,transform .15s,box-shadow .18s;
+  box-shadow:0 2px 8px rgba(91,110,245,0.28);
+}
+.send-btn:hover:not(:disabled){
+  background:var(--accent-dark);
+  transform:scale(1.07);
+  box-shadow:0 4px 14px rgba(91,110,245,0.38);
+}
+.send-btn:disabled{
+  background:var(--hint);
+  box-shadow:none;cursor:not-allowed;
+  transform:none;
+}
+
+/* ── ABOUT ── */
+.about-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;max-width:680px;margin:0 auto;
+}
+@media(max-width:560px){.about-grid{grid-template-columns:1fr}}
+.about-main{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-xl);
+  padding:1.8rem;
+  text-align:center;
+}
+.creator-av{
+  width:56px;height:56px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:var(--radius-lg);
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:500;color:#fff;
+  margin:0 auto 1.1rem;
+  box-shadow:0 4px 14px rgba(91,110,245,0.25);
+}
+.creator-name{font-size:17px;font-weight:500;margin-bottom:.2rem}
+.creator-role{font-size:13px;color:var(--muted);margin-bottom:1.1rem}
+.creator-note{font-size:13px;color:var(--muted);line-height:1.75;margin-bottom:1.3rem}
+.ig-link{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  padding:7px 16px;border-radius:var(--radius);
+  font-size:13px;color:var(--text);
+  text-decoration:none;
+  transition:border-color .2s,color .2s,transform .15s;
+}
+.ig-link:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+
+.about-what{
+  background:var(--accent-light);
+  border:1px solid rgba(91,110,245,0.15);
+  border-radius:var(--radius-xl);
+  padding:1.8rem;
+}
+.about-what h3{
+  font-family:var(--font-serif);
+  font-size:20px;font-weight:400;
+  margin-bottom:.8rem;color:var(--accent);
+}
+.about-what p{font-size:13.5px;color:var(--muted);line-height:1.75;margin-bottom:1rem}
+.about-what p:last-child{margin-bottom:0}
+
+/* ── FAQ ── */
+.faq-list{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.faq-item{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  transition:border-color .2s,box-shadow .2s;
+}
+.faq-item:hover{border-color:rgba(91,110,245,0.3);box-shadow:0 4px 16px rgba(0,0,0,0.05)}
+.faq-q{
+  padding:1rem 1.2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;font-size:14px;font-weight:500;
+  gap:12px;user-select:none;
+  transition:color .2s;
+}
+.faq-q:hover{color:var(--accent)}
+.faq-chevron{
+  flex-shrink:0;
+  width:18px;height:18px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--hint);
+  font-size:13px;font-weight:700;
+  transition:transform .3s,color .2s;
+  line-height:1;
+}
+.faq-item.open .faq-chevron{transform:rotate(180deg);color:var(--accent)}
+.faq-a{
+  max-height:0;overflow:hidden;
+  transition:max-height .35s ease,padding .3s;
+  font-size:13.5px;color:var(--muted);line-height:1.75;
+  padding:0 1.2rem;
+}
+.faq-item.open .faq-a{max-height:200px;padding:.2rem 1.2rem 1rem}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border);
+  padding:1.8rem 2rem;
+  margin-top:2rem;
+}
+.footer-inner{
+  max-width:860px;margin:0 auto;
+  display:flex;justify-content:space-between;
+  align-items:center;flex-wrap:wrap;gap:1rem;
+}
+.footer-logo{
+  font-family:var(--font-serif);
+  font-size:16px;
+  display:flex;align-items:center;gap:7px;
+}
+.footer-dot{width:7px;height:7px;background:var(--accent);border-radius:50%}
+.footer-links{display:flex;gap:1.4rem}
+.footer-links a{
+  font-size:13px;color:var(--muted);
+  cursor:pointer;text-decoration:none;
+  transition:color .2s;
+}
+.footer-links a:hover{color:var(--accent)}
+.footer-copy{font-size:12px;color:var(--hint);width:100%;text-align:center;margin-top:.3rem}
+
+/* ── SCROLL ANIMATIONS ── */
+.fade-in{
+  opacity:1;transform:none;
+  transition:opacity .55s ease,transform .55s ease;
+}
+/* JS adds .js-loaded to <body> so animations only run after script is ready */
+.js-loaded .fade-in{opacity:0;transform:translateY(20px)}
+.js-loaded .fade-in.visible{opacity:1;transform:none}
+.fade-in-delay{transition-delay:.1s}
+.fade-in-delay2{transition-delay:.2s}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .hero h1{font-size:36px}
+  .sec-title{font-size:26px}
+  .nav-links{display:none}
+  .footer-inner{flex-direction:column;text-align:center}
+  .footer-links{justify-content:center}
+  .hero-btns{flex-direction:column;align-items:center}
+}
+
+/* ── AUTH MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(28,27,24,0.55);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  padding:1rem;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-xl);
+  padding:2.2rem 2rem 2rem;
+  width:100%;max-width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.18);
+  transform:translateY(16px) scale(.97);
+  transition:transform .28s cubic-bezier(.22,.68,0,1.15);
+  position:relative;
+}
+.modal-overlay.open .modal{transform:none}
+.modal-close{
+  position:absolute;top:14px;right:16px;
+  background:none;border:none;cursor:pointer;
+  font-size:18px;line-height:1;color:var(--hint);
+  padding:4px 8px;border-radius:7px;
+  transition:color .15s,background .15s;
+}
+.modal-close:hover{color:var(--text);background:var(--surface2)}
+.modal-logo{
+  display:flex;align-items:center;gap:7px;
+  font-family:var(--font-serif);font-size:18px;
+  margin-bottom:1.4rem;
+}
+.modal-logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%}
+.modal-tabs{
+  display:flex;
+  background:var(--surface2);
+  border-radius:var(--radius);
+  padding:3px;margin-bottom:1.4rem;
+}
+.mtab{
+  flex:1;padding:7px;border-radius:7px;
+  font-size:13.5px;font-weight:500;
+  background:none;border:none;cursor:pointer;
+  font-family:var(--font-sans);color:var(--muted);
+  transition:background .18s,color .18s,box-shadow .18s;
+}
+.mtab.active{
+  background:var(--surface);color:var(--text);
+  box-shadow:0 1px 6px rgba(0,0,0,0.1);
+}
+.auth-form{display:flex;flex-direction:column;gap:11px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12.5px;font-weight:500;color:var(--muted)}
+.form-group input{
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:var(--radius);
+  padding:10px 13px;
+  font-size:14px;font-family:var(--font-sans);
+  color:var(--text);outline:none;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.form-group input:focus{
+  border-color:var(--accent);background:var(--surface);
+  box-shadow:0 0 0 3px rgba(91,110,245,0.09);
+}
+.form-group input::placeholder{color:var(--hint)}
+.auth-submit{
+  background:var(--accent);color:#fff;
+  border:none;border-radius:var(--radius);
+  padding:11px;font-size:14px;font-weight:500;
+  font-family:var(--font-sans);cursor:pointer;
+  box-shadow:0 3px 12px rgba(91,110,245,0.3);
+  transition:background .2s,transform .15s,box-shadow .2s;
+}
+.auth-submit:hover{
+  background:var(--accent-dark);
+  transform:translateY(-1px);
+  box-shadow:0 5px 18px rgba(91,110,245,0.38);
+}
+.auth-divider{
+  display:flex;align-items:center;gap:10px;
+  font-size:12px;color:var(--hint);
+}
+.auth-divider::before,.auth-divider::after{
+  content:'';flex:1;height:1px;background:var(--border2);
+}
+.auth-google{
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:10px;
+  font-size:13.5px;font-family:var(--font-sans);
+  cursor:pointer;color:var(--text);
+  transition:border-color .2s,box-shadow .15s,transform .15s;
+}
+.auth-google:hover{
+  border-color:rgba(91,110,245,0.4);
+  box-shadow:0 3px 12px rgba(0,0,0,0.07);
+  transform:translateY(-1px);
+}
+.auth-footer-note{text-align:center;font-size:12px;color:var(--hint)}
+.auth-footer-note a{color:var(--accent);cursor:pointer;text-decoration:none}
+.auth-footer-note a:hover{text-decoration:underline}
+/* Nav auth */
+.nav-auth{display:flex;gap:8px;align-items:center}
+.nav-signin{
+  background:none;border:1px solid var(--border2);
+  color:var(--muted);padding:7px 16px;
+  border-radius:var(--radius);font-size:13.5px;
+  cursor:pointer;font-family:var(--font-sans);font-weight:500;
+  transition:border-color .2s,color .2s;
+}
+.nav-signin:hover{border-color:var(--accent);color:var(--accent)}
+/* Fix textarea chatInput */
+#chatInput{
+  flex:1;background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 14px;color:var(--text);
+  font-size:13.5px;outline:none;
+  font-family:var(--font-sans);
+  line-height:1.5;resize:none;
+  min-height:38px;max-height:120px;
+  overflow-y:auto;
+  transition:border-color .2s,box-shadow .2s;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<nav>
+  <div class="nav-logo"><div class="nav-dot"></div>chouAI</div>
+  <div class="nav-links">
+    <a onclick="sc('features')">Features</a>
+    <a onclick="sc('demo')">Try it</a>
+    <a onclick="sc('pricing')">Pricing</a>
+    <a onclick="sc('faq')">FAQ</a>
+    <a onclick="sc('about')">About</a>
+  </div>
+  <div class="nav-auth">
+    <button class="nav-signin" onclick="openAuth('signin')">Sign in</button>
+    <button class="nav-cta" onclick="openAuth('signup')">Sign up free</button>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-badge">🎓 AI study companion for students</div>
+  <h1>Your <em>math problems</em><br>explained, step by step.</h1>
+  <p class="hero-sub">chouAI is an AI study companion that helps you understand math and exercises — not just get answers. Built for students, by a student.</p>
+  <div class="hero-btns">
+    <button class="btn-primary" onclick="sc('demo')">Start learning free →</button>
+    <button class="btn-outline" onclick="openAuth('signup')">Create account</button>
+  </div>
+  <div class="chat-preview">
+    <div class="cp-bar">
+      <div class="cp-av">🤖</div>
+      <div>
+        <div class="cp-name">chouAI</div>
+        <div class="cp-st"><div class="cp-dot"></div>Ready to help</div>
+      </div>
+    </div>
+    <div class="bubble u">How do I solve x² + 5x + 6 = 0?</div>
+    <div class="bubble b">Factor it as <code>(x + 2)(x + 3) = 0</code>, which gives <code>x = −2</code> or <code>x = −3</code>. Substitute back to verify!</div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ── FEATURES ── -->
+<section id="features" class="fade-in">
+  <p class="sec-label">What it does</p>
+  <p class="sec-title">Built for students</p>
+  <p class="sec-sub">Everything you need to understand your coursework — not just get the answer.</p>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon">➗</div>
+      <h3>Solve math problems</h3>
+      <p>From basic algebra to calculus — paste your problem and get a clear, honest explanation.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📖</div>
+      <h3>Understand exercises</h3>
+      <p>Don't just get the answer. Learn the method so you can solve the next problem yourself.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">💡</div>
+      <h3>Homework support</h3>
+      <p>Stuck at midnight? chouAI is always available — no appointment, no waiting.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🌐</div>
+      <h3>Any language</h3>
+      <p>Ask in French, English, or Arabic — chouAI will respond in the same language.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- ── PRICING ── -->
+<section id="pricing" class="fade-in">
+  <p class="sec-label">Pricing</p>
+  <p class="sec-title">Simple, honest pricing</p>
+  <p class="sec-sub">No hidden limits, no exaggerated claims. Just what you actually get.</p>
+  <div class="plans">
+    <div class="plan">
+      <div class="plan-pill">Free</div>
+      <div class="plan-name">Basic</div>
+      <div class="plan-desc">Good for trying chouAI or solving a few problems a day.</div>
+      <div class="plan-price"><span class="curr">$</span><span class="amt">0</span><span class="per">/mo</span></div>
+      <div class="plan-limit">ℹ️ 15 messages per day · resets at midnight</div>
+      <ul class="plan-feats">
+        <li><span class="feat-check">✓</span>15 messages per day</li>
+        <li><span class="feat-check">✓</span>Short, quick answers</li>
+        <li><span class="feat-check">✓</span>Math problem solving</li>
+        <li><span class="feat-check">✓</span>No sign-up needed</li>
+        <li><span class="feat-x">–</span><span style="color:var(--hint)">No detailed explanations</span></li>
+        <li><span class="feat-x">–</span><span style="color:var(--hint)">No complex breakdowns</span></li>
+      </ul>
+      <button class="btn-free" onclick="sc('demo')">Start for free</button>
+    </div>
+    <div class="plan featured">
+      <div class="plan-pill">Student</div>
+      <div class="plan-name">Premium</div>
+      <div class="plan-desc">For students who need proper explanations, not just quick answers.</div>
+      <div class="plan-price"><span class="curr">$</span><span class="amt">10</span><span class="per">/mo</span></div>
+      <div class="plan-limit">ℹ️ 200 messages per day · resets at midnight</div>
+      <ul class="plan-feats">
+        <li><span class="feat-check">✓</span>200 messages per day</li>
+        <li><span class="feat-check">✓</span>Teacher-style explanations</li>
+        <li><span class="feat-check">✓</span>Step-by-step reasoning</li>
+        <li><span class="feat-check">✓</span>Complex math support</li>
+        <li><span class="feat-check">✓</span>Longer, more detailed answers</li>
+        <li><span class="feat-check">✓</span>Higher quality responses</li>
+      </ul>
+      <button class="btn-paid" onclick="openAuth('signup')">Get Premium — $10/mo</button>
+    </div>
+  </div>
+  <div class="compare-note">
+    <p>The free plan is intentionally limited to keep the service sustainable. Premium gives you <strong>200 messages per day</strong> — plenty of room for deep, focused study sessions with full teacher-style explanations.</p>
+  </div>
+  <div class="pricing-note">🔒 Secure payment · Cancel anytime · No surprise charges</div>
+</section>
+
+<hr class="div">
+
+<!-- ── LIVE DEMO ── -->
+<section id="demo" class="fade-in">
+  <p class="sec-label">Live demo</p>
+  <p class="sec-title">Ask anything</p>
+  <p class="sec-sub">Toggle between Free and Premium to see the difference in answer quality.</p>
+  <div class="chat-wrap">
+    <div class="chat-header">
+      <div class="ch-left">
+        <div class="ch-av">🤖</div>
+        <div>
+          <div class="ch-name">chouAI assistant</div>
+          <div class="ch-sub" id="chSub"><span class="ch-status-dot"></span>Free · 15 messages/day · quick answers</div>
+        </div>
+      </div>
+      <div class="plan-toggle">
+        <div class="ptab active" id="tabFree" onclick="setPlan('free')">Free</div>
+        <div class="ptab" id="tabPaid" onclick="setPlan('paid')">Premium</div>
+      </div>
+    </div>
+    <div class="mode-bar">
+      <span class="mode-label">Mode</span>
+      <div class="mode-btns">
+        <button class="mbtn mode-quick" id="modeQuick" onclick="setMode('quick')" title="Short, direct answers">
+          <span class="mbtn-icon">⚡</span>Quick
+        </button>
+        <button class="mbtn mode-tutor active" id="modeTutor" onclick="setMode('tutor')" title="Full teacher-style explanations">
+          <span class="mbtn-icon">🎓</span>Tutor
+        </button>
+        <button class="mbtn mode-hint" id="modeHint" onclick="setMode('hint')" title="Guided discovery — no spoilers">
+          <span class="mbtn-icon">💡</span>Hint
+        </button>
+      </div>
+    </div>
+    <div class="chat-sugs">
+      <div class="sug" onclick="useSug(this)">Solve x² − 4 = 0</div>
+      <div class="sug" onclick="useSug(this)">What is a derivative?</div>
+      <div class="sug" onclick="useSug(this)">Explain Pythagoras</div>
+    </div>
+    <div class="chat-msgs" id="chatMsgs">
+      <div class="msg bot">Hi! I'm chouAI — ask me any math question and I'll help you understand it, not just solve it.</div>
+    </div>
+    <div class="chat-input-row">
+      <textarea id="chatInput" rows="1" placeholder="Type your question…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+      <button class="send-btn" onclick="sendMsg()" aria-label="Send">↑</button>
+    </div>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- ── ABOUT ── -->
+<section id="about" class="fade-in">
+  <p class="sec-label">About</p>
+  <p class="sec-title">Who made this</p>
+  <p class="sec-sub">A real person building something genuinely useful for students.</p>
+  <div class="about-grid">
+    <div class="about-main">
+      <div class="creator-av">CE</div>
+      <div class="creator-name">Chouaib El Figha</div>
+      <div class="creator-role">Creator of chouAI</div>
+      <p class="creator-note">I built chouAI because I wanted a simple, honest tool that helps students actually understand their coursework — not just hand them answers. It's a work in progress and I improve it every day.</p>
+      <a class="ig-link" href="https://instagram.com/chouaib.figha" target="_blank">📸 Instagram · @chouaib.figha</a>
+    </div>
+    <div class="about-what">
+      <h3>What is chouAI?</h3>
+      <p>chouAI is an AI study companion focused on math and exercises. It's not a generic chatbot — it's designed specifically to help students learn, not just copy answers.</p>
+      <p>It adapts its response depth to your plan: short and direct on Free, full teacher-style explanations on Premium.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- ── FAQ ── -->
+<section id="faq" class="fade-in">
+  <p class="sec-label">FAQ</p>
+  <p class="sec-title">Common questions</p>
+  <p class="sec-sub">Honest answers to what students actually ask.</p>
+  <div class="faq-list">
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        What exactly is chouAI?
+        <span class="faq-chevron">∨</span>
+      </div>
+      <div class="faq-a">chouAI is an AI study companion built specifically for students. You type in a math problem or homework question and it gives you a clear explanation — not just the answer. It's not a general-purpose chatbot; it's focused on helping you actually learn.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        Is it free?
+        <span class="faq-chevron">∨</span>
+      </div>
+      <div class="faq-a">Yes — there's a free plan that gives you 15 messages per day with short, direct answers. No sign-up required. If you want deeper, teacher-style explanations, the Premium plan is $10/month and gives you 200 messages per day.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        How does the AI help with math?
+        <span class="faq-chevron">∨</span>
+      </div>
+      <div class="faq-a">You paste or type your problem, and chouAI explains the method clearly. On Premium, it walks you through the reasoning step by step in a calm, encouraging tone — so you understand how to solve similar problems on your own, not just this one.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        Is it accurate?
+        <span class="faq-chevron">∨</span>
+      </div>
+      <div class="faq-a">chouAI is quite reliable for standard math topics like algebra, calculus, and geometry. That said, AI can make mistakes — especially on very complex or ambiguous problems. Always verify important answers, and use it as a learning aid, not a replacement for your teacher.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        What's the difference between Free and Premium?
+        <span class="faq-chevron">∨</span>
+      </div>
+      <div class="faq-a">Free gives you 15 short, direct answers per day — great for quick checks. Premium gives you full, detailed explanations with reasoning and context, plus 200 messages per day. Think of Free as a quick hint, Premium as a patient tutor.</div>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo"><div class="footer-dot"></div>chouAI</div>
+    <div class="footer-links">
+      <a onclick="sc('features')">Features</a>
+      <a onclick="sc('demo')">Demo</a>
+      <a onclick="sc('pricing')">Pricing</a>
+      <a onclick="sc('faq')">FAQ</a>
+      <a href="https://instagram.com/chouaib.figha" target="_blank">📸 @chouaib.figha</a>
+    </div>
+    <div class="footer-copy">Made by Chouaib El Figha · Powered by Mistral AI</div>
+  </div>
+</footer>
+
+</div>
+
+<!-- ── AUTH MODAL ── -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuth()">✕</button>
+    <div class="modal-logo"><div class="modal-logo-dot"></div>chouAI</div>
+    <div class="modal-tabs">
+      <button class="mtab active" id="tabSignin" onclick="switchAuthTab('signin')">Sign in</button>
+      <button class="mtab" id="tabSignup" onclick="switchAuthTab('signup')">Sign up</button>
+    </div>
+    <div class="auth-form" id="formSignin">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="siEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="siPass" placeholder="Your password" autocomplete="current-password">
+      </div>
+      <button class="auth-submit" onclick="handleSignIn()">Sign in</button>
+      <div class="auth-divider">or</div>
+      <button class="auth-google" onclick="handleGoogleAuth()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <p class="auth-footer-note">No account? <a onclick="switchAuthTab('signup')">Sign up free</a></p>
+    </div>
+    <div class="auth-form" id="formSignup" style="display:none">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="suName" placeholder="Your name" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="suEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="suPass" placeholder="Create a password" autocomplete="new-password">
+      </div>
+      <button class="auth-submit" onclick="handleSignUp()">Create free account</button>
+      <div class="auth-divider">or</div>
+      <button class="auth-google" onclick="handleGoogleAuth()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <p class="auth-footer-note">Already have an account? <a onclick="switchAuthTab('signin')">Sign in</a></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const MK="4KY3ErMVMEjHejMmtnWr67vgHz6KPSug";
+let plan="free";
+let tutorMode="tutor"; // 'quick' | 'tutor' | 'hint'
+// Keep last N turns so the AI has conversational context
+const MAX_HISTORY = 6;
+let chatHistory = [];
+
+// ── SYSTEM PROMPTS ────────────────────────────────────────────────────────────
+const MODE_PROMPTS={
+  quick:"You are chouAI, a calm and knowledgeable math tutor in Quick Answer mode.\n\nLANGUAGE: Detect the student's language and respond entirely in that language. Never mix languages.\n\nYOUR ROLE:\nGive a short, clear, direct answer — 2 to 4 sentences at most. State the key method or result and move on. No lengthy explanations, no padding, no filler. If there is one small insight worth mentioning, say it in one sentence.\n\nDo NOT use Step labels. Do NOT use bullet points. Feel like a knowledgeable tutor giving a quick, confident hint.\n\nMATH FORMATTING — STRICT:\n- ALL math must use LaTeX.\n- Inline: \\\\( ... \\\\) e.g. \\\\(x^2 + 1\\\\)\n- Display (key results only): \\\\[ ... \\\\]\n- Never write raw math like x^2 or sqrt(x) without LaTeX.",
+
+  tutor:"You are chouAI, a calm, intelligent, and genuinely helpful math tutor in Tutor mode.\n\nLANGUAGE: Detect the student's language and respond entirely in that language. Never mix languages.\n\nYOUR ROLE:\nYou are a real teacher, not a list-generator. Your goal is deep understanding, not just a correct answer. Write in natural, flowing prose. Explain the reasoning behind each step. When a formula appears, say briefly where it comes from or why it works.\n\nNever use Step headers. Never use bullet points unless genuinely listing separate cases. Never open with filler phrases. Never repeat the question back.\n\nTONE: Calm, precise, encouraging. Like a patient tutor who genuinely wants you to understand.\n\nMATH FORMATTING — STRICT:\n- ALL math must use LaTeX.\n- Inline: \\\\( ... \\\\) for expressions within prose\n- Display: \\\\[ ... \\\\] for key results and standalone equations\n- Never write raw math without LaTeX.",
+
+  hint:"You are chouAI, a calm and encouraging math tutor in Hint mode.\n\nLANGUAGE: Detect the student's language and respond entirely in that language. Never mix languages.\n\nYOUR ROLE:\nDo NOT give the full solution immediately. Guide the student toward the answer through thinking — not hand it to them. This is the Socratic method applied to math.\n\n1. Acknowledge what they are working on in one warm sentence.\n2. Identify the key insight or obstacle they need to overcome.\n3. Ask one focused guiding question, or give one small nudge that points them in the right direction without revealing the answer.\n4. Only reveal the full solution if the student has tried multiple times and is clearly stuck.\n\nTONE: Warm, patient, encouraging.\n\nMATH FORMATTING — STRICT:\n- ALL math must use LaTeX.\n- Inline: \\\\( ... \\\\)\n- Display: \\\\[ ... \\\\]\n- Never write raw math without LaTeX."
+};
+
+// For backward compat — map plan to a prompt key (plan still controls token budget)
+const PROMPTS = {
+  free: MODE_PROMPTS.quick,
+  paid: MODE_PROMPTS.tutor
+};
+
+// ── MATH RENDERING ────────────────────────────────────────────────────────────
+// Strategy: split the AI response into LaTeX segments and plain-text segments
+// before any HTML escaping. Render each LaTeX segment with katex.renderToString,
+// escape and lightly format plain text, then reassemble.
+
+const KATEX_OPTS = {
+  throwOnError: false,
+  output: "html",
+  trust: false
+};
+
+// Ordered list of delimiters to scan for. Longer/greedier first.
+const DELIMITERS = [
+  { open: "\\[",  close: "\\]",  display: true  },
+  { open: "\\(",  close: "\\)",  display: false  },
+  { open: "$$",   close: "$$",   display: true   },
+  // Single-$ inline — only match when surrounded by non-space, non-dollar chars
+  // to avoid false positives on plain dollar signs.
+  { open: "$",    close: "$",    display: false  },
+];
+
+function renderResponse(text, el) {
+  // Split text into alternating [plain, math, plain, math, ...] segments.
+  // We scan character-by-character tracking which delimiter we're inside.
+  const segments = []; // { type: "text"|"math", content, display }
+  let i = 0;
+  let plainStart = 0;
+
+  outer: while (i < text.length) {
+    for (const delim of DELIMITERS) {
+      if (text.startsWith(delim.open, i)) {
+        // Save plain text before this delimiter
+        if (i > plainStart) {
+          segments.push({ type: "text", content: text.slice(plainStart, i) });
+        }
+        const closeIdx = text.indexOf(delim.close, i + delim.open.length);
+        if (closeIdx !== -1) {
+          const mathContent = text.slice(i + delim.open.length, closeIdx);
+          segments.push({ type: "math", content: mathContent, display: delim.display });
+          i = closeIdx + delim.close.length;
+          plainStart = i;
+          continue outer;
+        }
+        // No matching close — treat as plain text, keep scanning
+      }
+    }
+    i++;
+  }
+  // Remaining plain text
+  if (plainStart < text.length) {
+    segments.push({ type: "text", content: text.slice(plainStart) });
+  }
+
+  // Build raw HTML from segments (math rendered, text escaped + light markdown)
+  let raw = "";
+  for (const seg of segments) {
+    if (seg.type === "math") {
+      try {
+        raw += katex.renderToString(seg.content, { ...KATEX_OPTS, displayMode: seg.display });
+      } catch (e) {
+        raw += "<code>" + seg.content.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</code>";
+      }
+    } else {
+      let safe = seg.content
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      safe = safe.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+      safe = safe.replace(/\x60([^\x60\n]+)\x60/g, "<code>$1</code>");
+      raw += safe;
+    }
+  }
+
+  // Split assembled string into semantic blocks (paragraphs / lists)
+  const blocks = raw.split(/\n{2,}/);
+  const rendered = blocks.map(block => {
+    const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return "";
+
+    // Numbered list
+    if (lines.length > 1 && lines.every(l => /^\d+[\.\)]\s/.test(l))) {
+      const items = lines.map(l => `<li>${l.replace(/^\d+[\.\)]\s+/, "")}</li>`).join("");
+      return `<ol class="msg-list">${items}</ol>`;
+    }
+    // Bullet list
+    if (lines.length > 1 && lines.every(l => /^[-•]\s/.test(l))) {
+      const items = lines.map(l => `<li>${l.replace(/^[-•]\s+/, "")}</li>`).join("");
+      return `<ul class="msg-list">${items}</ul>`;
+    }
+    // Paragraph
+    return `<p class="msg-para">${lines.join("<br>")}</p>`;
+  }).filter(Boolean).join("");
+
+  el.innerHTML = rendered || raw;
+}
+
+// Variant that appends rendered content into el (preserves existing children like mode-tag)
+function appendResponse(text, el) {
+  const wrapper = document.createElement("span");
+  renderResponse(text, wrapper);
+  // Move children from wrapper into el
+  while(wrapper.firstChild) el.appendChild(wrapper.firstChild);
+}
+
+// ── PLAN TOGGLE ───────────────────────────────────────────────────────────────
+function setPlan(p){
+  plan=p;
+  chatHistory=[];  // fresh context for the new mode
+  document.getElementById("tabFree").className="ptab"+(p==="free"?" active":"");
+  document.getElementById("tabPaid").className="ptab"+(p==="paid"?" active":"");
+  updateSubLabel();
+  const box=document.getElementById("chatMsgs");
+  const n=document.createElement("div");
+  n.className="msg bot";
+  const switchMsg = p==="free"
+    ? "Switched to Free mode — I'll keep answers short and to the point."
+    : "Switched to Premium — I'll walk you through the full reasoning now.";
+  renderResponse(switchMsg, n);
+  box.appendChild(n);
+  box.scrollTop=box.scrollHeight;
+}
+
+// ── MODE SELECTOR ─────────────────────────────────────────────────────────────
+const MODE_META = {
+  quick: { id:"modeQuick", label:"⚡ Quick Answer",  switchMsg:"Quick Answer mode — I'll be brief and direct." },
+  tutor: { id:"modeTutor", label:"🎓 Tutor",         switchMsg:"Tutor mode — I'll walk you through the full reasoning." },
+  hint:  { id:"modeHint",  label:"💡 Hint",          switchMsg:"Hint mode — I'll guide you, not give it all away. Try me!" }
+};
+
+function setMode(m){
+  if(m===tutorMode) return;
+  tutorMode=m;
+  chatHistory=[];
+  // Update button states
+  ["quick","tutor","hint"].forEach(k=>{
+    const el=document.getElementById(MODE_META[k].id);
+    el.classList.toggle("active", k===m);
+  });
+  // Update chat sub-label
+  updateSubLabel();
+  // Post switch message
+  const box=document.getElementById("chatMsgs");
+  const n=document.createElement("div");
+  n.className="msg bot";
+  renderResponse(MODE_META[m].switchMsg, n);
+  box.appendChild(n);
+  box.scrollTop=box.scrollHeight;
+}
+
+function updateSubLabel(){
+  const dot='<span class="ch-status-dot"></span>';
+  const modeNames={quick:"Quick Answer",tutor:"Tutor",hint:"Hint"};
+  const planLabel=plan==="paid"?"Premium":"Free";
+  document.getElementById("chSub").innerHTML=
+    `${dot}${planLabel} · ${modeNames[tutorMode]} mode`;
+}
+
+
+function useSug(el){
+  document.getElementById("chatInput").value=el.textContent.trim();
+  sendMsg();
+}
+
+// ── SEND MESSAGE ──────────────────────────────────────────────────────────────
+async function sendMsg(){
+  const inp=document.getElementById("chatInput");
+  const box=document.getElementById("chatMsgs");
+  const txt=inp.value.trim();
+  if(!txt)return;
+  inp.value="";
+
+  // User bubble
+  const ud=document.createElement("div");
+  ud.className="msg user";
+  ud.textContent=txt;
+  box.appendChild(ud);
+
+  // Typing indicator
+  const ld=document.createElement("div");
+  ld.className="msg bot";
+  const thinkingLabels={quick:"Answering",tutor:"Thinking",hint:"Pondering"};
+  ld.innerHTML=`<div class="typing-label"><span class="typing-thinking">${thinkingLabels[tutorMode]}</span><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+  box.appendChild(ld);
+  box.scrollTop=box.scrollHeight;
+
+  // Add user message to history
+  chatHistory.push({role:"user", content:txt});
+  if(chatHistory.length > MAX_HISTORY*2) chatHistory = chatHistory.slice(-MAX_HISTORY*2);
+
+  // Token budget: hint mode uses more tokens (guiding takes space), quick uses fewer
+  const tokenBudget = plan==="paid"
+    ? (tutorMode==="quick"?200 : tutorMode==="hint"?700 : 900)
+    : (tutorMode==="quick"?140 : tutorMode==="hint"?400 : 160);
+
+  try{
+    const r=await fetch("https://api.mistral.ai/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+MK},
+      body:JSON.stringify({
+        model:"mistral-small-latest",
+        max_tokens:tokenBudget,
+        temperature:tutorMode==="hint"?0.5:0.45,
+        messages:[
+          {role:"system", content:MODE_PROMPTS[tutorMode]},
+          ...chatHistory
+        ]
+      })
+    });
+    const d=await r.json();
+    const rep=d.choices?.[0]?.message?.content||"Sorry, something went wrong. Please try again.";
+    // Add assistant reply to history
+    chatHistory.push({role:"assistant", content:rep});
+    if(chatHistory.length > MAX_HISTORY*2) chatHistory = chatHistory.slice(-MAX_HISTORY*2);
+    // Render response with small mode tag
+    ld.innerHTML="";
+    const tagLabels={quick:"⚡ Quick",tutor:"🎓 Tutor",hint:"💡 Hint"};
+    const tag=document.createElement("span");
+    tag.className=`mode-tag ${tutorMode}`;
+    tag.textContent=tagLabels[tutorMode];
+    ld.appendChild(tag);
+    const br=document.createElement("br");
+    ld.appendChild(br);
+    appendResponse(rep, ld);
+  }catch(e){
+    ld.innerHTML="";
+    ld.textContent="Connection error. Please check your connection and try again.";
+  }
+  box.scrollTop=box.scrollHeight;
+}
+
+// ── SCROLL TO SECTION ─────────────────────────────────────────────────────────
+function sc(id){
+  const el=document.getElementById(id);
+  if(el)el.scrollIntoView({behavior:"smooth"});
+}
+
+// ── FAQ ACCORDION ─────────────────────────────────────────────────────────────
+function toggleFaq(el){
+  el.parentElement.classList.toggle("open");
+}
+
+// ── SCROLL FADE-IN OBSERVER ───────────────────────────────────────────────────
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add("visible");
+      obs.unobserve(e.target);
+    }
+  });
+},{threshold:0.08});
+document.querySelectorAll(".fade-in").forEach(el=>obs.observe(el));
+
+// Init sub-label
+updateSubLabel();
+// ── ADD js-loaded CLASS so fade-in animations activate ───────────────────────
+document.body.classList.add('js-loaded');
+
+// ── AUTH MODAL ────────────────────────────────────────────────────────────────
+function openAuth(tab){
+  tab = tab || 'signin';
+  switchAuthTab(tab);
+  document.getElementById('authModal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeAuth(){
+  document.getElementById('authModal').classList.remove('open');
+  document.body.style.overflow='';
+}
+// Close on overlay click
+document.getElementById('authModal').addEventListener('click', function(e){
+  if(e.target===this) closeAuth();
+});
+// Close on Escape
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape') closeAuth();
+});
+function switchAuthTab(tab){
+  document.getElementById('tabSignin').classList.toggle('active', tab==='signin');
+  document.getElementById('tabSignup').classList.toggle('active', tab==='signup');
+  document.getElementById('formSignin').style.display = tab==='signin' ? 'flex' : 'none';
+  document.getElementById('formSignup').style.display = tab==='signup' ? 'flex' : 'none';
+}
+function handleSignIn(){
+  const email=document.getElementById('siEmail').value.trim();
+  const pass=document.getElementById('siPass').value;
+  if(!email||!pass){alert('Please fill in all fields.');return;}
+  console.log('[Auth] Sign in:', email);
+  alert('Sign-in backend coming in next phase.');
+}
+function handleSignUp(){
+  const name=document.getElementById('suName').value.trim();
+  const email=document.getElementById('suEmail').value.trim();
+  const pass=document.getElementById('suPass').value;
+  if(!name||!email||!pass){alert('Please fill in all fields.');return;}
+  console.log('[Auth] Sign up:', name, email);
+  alert('Sign-up backend coming in next phase.');
+}
+function handleGoogleAuth(){
+  alert('Google sign-in coming in next phase.');
+}
+
+// ── SUPABASE INIT ─────────────────────────────────────────────────────────────
+const supabaseUrl = "PROJECT_URL";
+const supabaseKey = "PUBLISHABLE_KEY";
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+(async()=>{
+  try{
+    const{data,error}=await supabase.auth.getUser();
+    if(error) console.warn('[Supabase]',error.message);
+    else console.log('[Supabase] Connected. User:', data.user ?? null);
+  }catch(err){ console.error('[Supabase] Failed:', err); }
+})();
+
+</script>
+</body>
+</html>
